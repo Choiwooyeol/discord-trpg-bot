@@ -40,6 +40,11 @@ export class GameEngine {
     const a=e.action;let p=s.players.find(p=>p.userId===e.userId);const host=e.userId===s.hostId;
     if(a==='status')return {text:this.describe(s),session:s};
     if(a==='log')return {text:s.recent.join('\n\n')||'아직 확정된 사건이 없습니다.',session:s};
+    if(a==='adventureSummary'){
+      const facts=(s.world.facts||[]).slice(-8);
+      const characters=s.players.map(p=>`${p.name}: ${p.character?.role||'직업 미정'}${p.character?.specialty?` · 특기 ${p.character.specialty}`:''}`).join('\n');
+      return {text:[`**${s.world.name} · 모험 요약**`,`장르: ${s.world.genre||'랜덤'} · 장면 ${s.scene}`,`현재 위치: ${s.world.location||'알 수 없음'}`,`현재 목표: ${s.world.objective||s.world.premise||'이야기 속에서 찾아가세요.'}`,s.world.factions?.length?`주요 세력: ${s.world.factions.join(', ')}`:'',facts.length?`최근 단서\n${facts.map(f=>`• ${f}`).join('\n')}`:'',characters?`파티\n${characters}`:''].filter(Boolean).join('\n\n'),session:s};
+    }
     if(a==='characterInfo'){
       if(!p)return this._deny('먼저 [참가] 또는 직업 버튼으로 모험에 참가해 주세요.');
       const c=p.character;

@@ -10,6 +10,7 @@ export class Application {
     if (event.action === 'create') return this.create(event);
     if (event.action === 'createSolo') return this.createSolo(event);
     if (event.action === 'listGames') return this.listGames(event);
+    if (event.action === 'cleanupLobbies') return this.cleanupLobbies(event);
     if (event.action === 'gameDiagnostic') return this.gameDiagnostic(event);
     const session = this.store.byThread(event.guildId,event.threadId);
     // Ignore ordinary chatter outside registered game threads.
@@ -87,6 +88,14 @@ export class Application {
     if (!active.length) return { text: '열린 모험방이 없어요. /게임시작으로 새 게임을 만들면 됩니다.' };
     const state=s=>s.status==='LOBBY' ? '준비 중' : s.status==='PAUSED' ? '일시정지' : '진행 중';
     return { text:[`**열린 모험방 ${active.length}개**`,...active.map(s=>`<#${s.threadId}> · ${state(s)}${s.hostId===event.userId?' · 내가 파티장':''}`),'내가 파티장인 방을 새로 시작하고 싶으면, 해당 방에서 /게임종료 → 종료 확정을 누르세요.'].join('\n') };
+  }
+
+  async cleanupLobbies(event) {
+    if (!this.config.lobbyIds.includes(event.threadId)) return { text: 'TRPG 로비 채널에서 /내로비정리를 사용하세요.' };
+    const targets=this.store.all().filter(s=>s.guildId===event.guildId&&s.hostId===event.userId&&s.status==='LOBBY');
+    if (!targets.length) return { text: '내가 파티장인 준비 중 로비가 없습니다.' };
+    for (const session of targets) await this.engine.handle({ ...event, id:`cleanup-lobby:${event.id}:${session.id}`, threadId:session.threadId, action:'end' });
+    return { text:`준비만 남아 있던 내 로비 ${targets.length}개를 종료했습니다. 기록은 보존되며 새 게임 슬롯이 비었습니다.\n${targets.map(s=>`<#${s.threadId}>`).join('\n')}` };
   }
 
   gameDiagnostic(event) {

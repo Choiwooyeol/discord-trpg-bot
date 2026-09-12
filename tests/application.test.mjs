@@ -116,6 +116,25 @@ test('capacity error explains how to recover without ending an in-progress game'
   assert.equal(x.threads.length, 1);
 });
 
+test('lobby cleanup ends only the caller’s unstarted lobbies and frees capacity', async t => {
+  const x = setup(); t.after(() => x.store.close());
+  await x.app.handle(createEvent());
+  const result = await x.app.handle({ id: 'cleanup', guildId: 'guild-1', threadId: 'lobby-1', userId: 'host', action: 'cleanupLobbies' });
+  assert.match(result.text, /종료했습니다/);
+  assert.equal(x.store.byThread('guild-1', 'thread-1').status, 'ENDED');
+});
+
+test('adventure summary exposes goal, factions, facts, and party without changing state', async t => {
+  const x = setup(); t.after(() => x.store.close()); await x.app.handle(createEvent());
+  const session = x.store.byThread('guild-1', 'thread-1');
+  session.world.objective = '신호의 정체를 밝힌다'; session.world.factions = ['관리국']; session.world.facts = ['푸른 신호가 반복된다'];
+  x.store.commit(session, session.version, 'summary-seed', 'seed', {});
+  const result = await x.app.handle({ id: 'summary', guildId: 'guild-1', threadId: 'thread-1', userId: 'host', action: 'adventureSummary' });
+  assert.match(result.text, /현재 목표.*신호의 정체/);
+  assert.match(result.text, /주요 세력.*관리국/);
+  assert.match(result.text, /최근 단서/);
+});
+
 test('only an administrator can create and start a one-player adventure', async t => {
   const x = setup(); t.after(() => x.store.close());
   const base = { id: 'solo-create', guildId: 'guild-1', threadId: 'lobby-1', userId: 'host', name: 'Host', action: 'createSolo', value: { tone: 'solo' } };

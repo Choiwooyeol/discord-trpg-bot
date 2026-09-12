@@ -24,7 +24,9 @@ const commands = [
   ] },
   { name: '도움말', description: '지금 무엇을 하면 되는지 버튼과 함께 알려 드려요' },
   { name: '게임목록', description: '열린 모험방을 보고, 이전 방으로 돌아갑니다' },
+  { name: '내로비정리', description: '내가 파티장인 준비 중 로비를 모두 종료합니다' },
   { name: '내캐릭터', description: '내 캐릭터의 직업·능력치·HP·아이템을 봅니다' },
+  { name: '모험요약', description: '현재 목표, 단서, 세력과 파티 정보를 봅니다' },
   { name: '게임진단', description: '봇 연결, 열린 방과 오늘 AI 사용량을 확인합니다' },
   { name: '행동', description: '하고 싶은 행동을 적습니다 · 그냥 채팅으로 적어도 돼요', options: [{ type: 3, name: '내용', description: '예: 등불 주변의 발자국을 조사한다', required: true }] },
   ...[['참가','세션에 참가합니다'],['준비','준비 상태를 바꿉니다'],['시작','모험을 시작합니다'],['진행','현재 장면을 진행합니다'],['게임상태','현재 상태를 봅니다'],['로그','최근 기록을 봅니다'],['나가기','세션에서 나갑니다'],['복귀','세션에 복귀합니다'],['일시정지','세션을 일시정지합니다'],['재개','세션을 재개합니다'],['게임종료','세션을 종료합니다']].map(([name, description]) => ({ name, description }))
@@ -133,8 +135,8 @@ export class DiscordClient {
     await this.request(callback, 'POST', defer, false);
     let action, value = {};
     if (i.type === 2) {
-      const name = i.data?.name; const map = { '혼자시작': 'createSolo', '게임시작': 'create', '캐릭터': 'character', '내캐릭터': 'characterInfo', '게임진단': 'gameDiagnostic', '참가': 'join', '준비': 'ready', '시작': 'start', '진행': 'progress', '행동': 'input', '게임상태': 'status', '로그': 'log', '나가기': 'leave', '복귀': 'resume', '일시정지': 'pause', '재개': 'resume', '게임종료': 'end' };
-      action = name === '도움말' ? 'helpGuide' : name === '게임목록' ? 'listGames' : map[name] || name; if (action === 'progress') action = 'advance'; if (action === 'resume') action = name === '복귀' ? 'return' : 'resume';
+      const name = i.data?.name; const map = { '혼자시작': 'createSolo', '게임시작': 'create', '캐릭터': 'character', '내캐릭터': 'characterInfo', '모험요약': 'adventureSummary', '게임진단': 'gameDiagnostic', '참가': 'join', '준비': 'ready', '시작': 'start', '진행': 'progress', '행동': 'input', '게임상태': 'status', '로그': 'log', '나가기': 'leave', '복귀': 'resume', '일시정지': 'pause', '재개': 'resume', '게임종료': 'end' };
+      action = name === '도움말' ? 'helpGuide' : name === '게임목록' ? 'listGames' : name === '내로비정리' ? 'cleanupLobbies' : map[name] || name; if (action === 'progress') action = 'advance'; if (action === 'resume') action = name === '복귀' ? 'return' : 'resume';
       const optionNames = { 이름: 'name', 직업: 'role', 강점: 'focus', 특기: 'specialty', 약점: 'weakness', 분위기: 'tone', 장르: 'scenario', 언어: 'language', 내용: 'text' };
       for (const o of i.data?.options || []) value[optionNames[o.name] || o.name] = o.value;
       if (action === 'create' || action === 'createSolo') value = { tone: value.tone, scenario: value.scenario, language: value.language };
