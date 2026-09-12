@@ -14,11 +14,11 @@ export class GameEngine {
     this.consensusMs=config.consensusMs??(config.consensusSeconds??30)*1000;this.combatMs=config.combatMs??(config.combatSeconds??90)*1000;
     this.now=options.now??Date.now;this.roll=options.roll;this.inFlight=new Map();
   }
-  create({guildId,threadId,hostId,name,tone='판타지',scenarioId,minPartySize=this.config.minPartySize}) {
+  create({guildId,threadId,hostId,name,tone='판타지',scenarioId,language,minPartySize=this.config.minPartySize}) {
     minPartySize=Number(minPartySize);
     if(!Number.isInteger(minPartySize)||minPartySize<1||minPartySize>this.config.maxPartySize)throw Error('Invalid min party size.');
     if(this.store.all().filter(s=>s.status!=='ENDED').length>=this.config.maxActiveSessions)throw Error('최대 세션 수에 도달했습니다.');
-    const id=randomUUID(), campaign=createCampaign({id,genre:scenarioId,tone,name:clean(name)});
+    const id=randomUUID(), campaign=createCampaign({id,genre:scenarioId,tone,name:clean(name),language});
     return this.store.create({id,guildId,threadId,hostId,status:'LOBBY',version:0,phase:0,scene:0,phaseStartedAt:this.now(),deadline:null,minPartySize,maxPartySize:this.config.maxPartySize,players:[],actions:{},world:campaign,summary:'',recent:[],choices:[],combat:null});
   }
   _phase(s,status){transition(s,status);s.phaseStartedAt=this.now();}

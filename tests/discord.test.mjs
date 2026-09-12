@@ -42,6 +42,13 @@ test('session renderer creates bounded, safe controls', () => {
   assert.match(rendered.content, /직업 선택 → ② 준비 완료/);
 });
 
+test('English sessions render English setup guidance and controls', () => {
+  const rendered = renderSession({ id: 'en', phase: 0, status: 'LOBBY', minPartySize: 1, players: [], choices: [], world: { language: 'en', genre: 'Science Fiction', premise: 'a lost signal' } });
+  assert.match(rendered.content, /Adventure setup/);
+  assert.match(rendered.content, /Science Fiction/);
+  assert.ok(rendered.components.flatMap(row => row.components).some(button => button.label === 'Ready / cancel'));
+});
+
 test('Korean character options offer named jobs and accept both new and cached option names', async () => {
   const calls = [], events = [];
   const client = new DiscordClient({ token: 't', guildIds: ['g'] }, { fetchFn: async (url, opts) => { calls.push({ url, opts }); return response({}); } });

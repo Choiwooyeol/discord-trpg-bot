@@ -95,3 +95,14 @@ test('장르별 캠페인과 자유 직업은 고정 역할 목록 없이 준비
   assert.equal(started.session.status, 'EXPLORATION_COLLECTING');
   store.close();
 });
+
+test('영어 세션은 영어 세계관과 선택지를 생성한다', () => {
+  const store = new Store(':memory:');
+  const engine = new GameEngine(store, director, { minPartySize: 1 });
+  const session = engine.create({ guildId: 'g', threadId: 'english', hostId: 'u1', scenarioId: 'cyberpunk', language: 'en' });
+  assert.equal(session.world.language, 'en');
+  assert.equal(session.world.genre, 'Cyberpunk');
+  assert.match(session.world.opening, /Your story begins/);
+  assert.match(session.world.starterChoices[0].label, /Investigate/);
+  store.close();
+});

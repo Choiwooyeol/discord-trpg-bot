@@ -11,9 +11,10 @@ const scenarioOption = { type: 3, name: '장르', description: '선택 사항 ·
   { name: '완전 랜덤', value: 'random' }, { name: '판타지', value: 'fantasy' }, { name: 'SF', value: 'sf' },
   { name: '무협', value: 'martial' }, { name: '사이버펑크', value: 'cyberpunk' }, { name: '미스터리', value: 'mystery' }
 ] };
+const languageOption = { type: 3, name: '언어', description: '선택 사항 · 비우면 Discord 언어를 따릅니다', required: false, choices: [{ name: '한국어', value: 'ko' }, { name: 'English', value: 'en' }] };
 const commands = [
-  { name: '혼자시작', description: '관리자 전용 · 혼자 즐길 1인 모험방을 만듭니다', default_member_permissions: '8', options: [{ type: 3, name: '분위기', description: '선택 사항 · 예: 가벼운 판타지, 으스스한 추리', required: false }, scenarioOption] },
-  { name: '게임시작', description: '친구들과 놀 새 모험방을 만듭니다', options: [{ type: 3, name: '분위기', description: '선택 사항 · 예: 가벼운 판타지, 으스스한 추리', required: false }, scenarioOption] },
+  { name: '혼자시작', description: '관리자 전용 · 혼자 즐길 1인 모험방을 만듭니다', default_member_permissions: '8', options: [{ type: 3, name: '분위기', description: '선택 사항 · 예: 가벼운 판타지, 으스스한 추리', required: false }, scenarioOption, languageOption] },
+  { name: '게임시작', description: '친구들과 놀 새 모험방을 만듭니다', options: [{ type: 3, name: '분위기', description: '선택 사항 · 예: 가벼운 판타지, 으스스한 추리', required: false }, scenarioOption, languageOption] },
   { name: '캐릭터', description: '자유 직업과 이름을 정합니다 · 예: 남궁세가 가신, 네트러너', options: [
     { type: 3, name: '직업', description: '자유롭게 적으세요 · 예: 남궁세가 가신, 화성 광산 기술자', required: true },
     { type: 3, name: '강점', description: '선택 사항 · 주사위에 강한 분야를 정합니다', required: false, choices: [{ name: '전투·힘', value: '전투' }, { name: '탐험·기동', value: '탐험' }, { name: '기술·지식', value: '지식' }, { name: '교섭·의지', value: '교섭' }] },
@@ -123,7 +124,7 @@ export class DiscordClient {
     return result;
   }
   async interaction(i) {
-    const user = userOf(i.member, i.user), base = { id: i.id, guildId: i.guild_id, threadId: i.channel_id, userId: user.id, name: i.member?.nick || user.global_name || user.username, isAdministrator: isAdministrator(i.member?.permissions) };
+    const user = userOf(i.member, i.user), base = { id: i.id, guildId: i.guild_id, threadId: i.channel_id, userId: user.id, name: i.member?.nick || user.global_name || user.username, locale: i.locale || i.guild_locale, isAdministrator: isAdministrator(i.member?.permissions) };
     if (!this.allowed(i.guild_id)) return;
     const callback = `/interactions/${i.id}/${i.token}/callback`;
     // Button clicks update the persistent game panel.  Type 6 acknowledges
@@ -134,9 +135,9 @@ export class DiscordClient {
     if (i.type === 2) {
       const name = i.data?.name; const map = { '혼자시작': 'createSolo', '게임시작': 'create', '캐릭터': 'character', '내캐릭터': 'characterInfo', '게임진단': 'gameDiagnostic', '참가': 'join', '준비': 'ready', '시작': 'start', '진행': 'progress', '행동': 'input', '게임상태': 'status', '로그': 'log', '나가기': 'leave', '복귀': 'resume', '일시정지': 'pause', '재개': 'resume', '게임종료': 'end' };
       action = name === '도움말' ? 'helpGuide' : name === '게임목록' ? 'listGames' : map[name] || name; if (action === 'progress') action = 'advance'; if (action === 'resume') action = name === '복귀' ? 'return' : 'resume';
-      const optionNames = { 이름: 'name', 직업: 'role', 강점: 'focus', 특기: 'specialty', 약점: 'weakness', 분위기: 'tone', 장르: 'scenario', 내용: 'text' };
+      const optionNames = { 이름: 'name', 직업: 'role', 강점: 'focus', 특기: 'specialty', 약점: 'weakness', 분위기: 'tone', 장르: 'scenario', 언어: 'language', 내용: 'text' };
       for (const o of i.data?.options || []) value[optionNames[o.name] || o.name] = o.value;
-      if (action === 'create' || action === 'createSolo') value = { tone: value.tone, scenario: value.scenario };
+      if (action === 'create' || action === 'createSolo') value = { tone: value.tone, scenario: value.scenario, language: value.language };
       if (action === 'input' && value.text) value = value.text;
     }
     else if (i.type === 3) { const parts = String(i.data?.custom_id || '').split(':'); if (parts.length < 4 || parts[0] !== 'trpg' || parts[1].length > 36) return; action = parts[3]; value = parts.slice(4).join(':'); base.sessionId = parts[1]; base.phase = Number.isNaN(Number(parts[2])) ? parts[2] : Number(parts[2]); }

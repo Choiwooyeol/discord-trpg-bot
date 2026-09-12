@@ -6,6 +6,35 @@ const playerName = (player, index = 0) => {
   return name || `플레이어 ${index + 1}`;
 };
 export function sessionGuide(session) {
+  const english = session.world?.language === 'en';
+  if (english) {
+    if (session.status === 'LOBBY') {
+      const players = session.players || [], minimum = session.minPartySize ?? 2;
+      const waiting = players.filter(p => !p.ready || !validCharacter(p));
+      return [
+        '**Adventure setup — use the controls below**',
+        '1. Choose a role or create one with `/캐릭터` → 2. Mark ready → 3. The host starts the adventure.',
+        `${session.world?.genre || 'Random'} world · ${session.world?.premise || 'Your first problem will be revealed when the game starts.'}`,
+        `\n**Players: ${players.length} · minimum: ${minimum}**`,
+        ...players.map((p, index) => `${playerName(p, index).slice(0, 40)}${p.userId === session.hostId ? ' (host)' : ''} · ${validCharacter(p) ? `${p.character.role} · ${p.ready ? '✅ ready' : 'needs to ready up'}` : 'needs a role'}`),
+        players.length < minimum ? `\n${minimum - players.length} more player(s) needed.` : waiting.length ? '\nEveryone must choose a role and mark ready.' : '\nEveryone is ready. The host can start the adventure.',
+        'Free-form roles, names, specialties, and weaknesses can be set before play with `/캐릭터`.'
+      ].join('\n');
+    }
+    if (session.status === 'EXPLORATION_COLLECTING') {
+      const players = session.players || [], actions = session.actions || {};
+      const pending = players.filter(p => p.presence !== 'away' && p.ready && !actions[p.userId]);
+      const submitted = players.filter(p => p.presence !== 'away' && p.ready && actions[p.userId]);
+      const waiting = pending.length ? `Waiting for: ${pending.map(p => playerName(p, players.indexOf(p))).join(', ')}` : submitted.length ? 'Everyone has acted. Preparing the next scene.' : 'Enter an action to begin this scene.';
+      const selected = submitted.map(p => `${playerName(p, players.indexOf(p))}: ${String(session.choices?.find(choice => choice.intent === actions[p.userId]?.value)?.label || actions[p.userId]?.value || '').slice(0, 90)}`).join('\n');
+      return `Choose an option below or type a free-form action in chat. The bot rolls dice. Start chatter with // .\n${waiting}${selected ? `\n\n**Submitted actions**\n${selected}` : ''}`;
+    }
+    if (session.status === 'COMBAT_TURN') return 'Only the current player may act: attack, defend, help an ally, or use a potion.';
+    if (session.status === 'CONSENSUS_VOTE') return 'The party chose incompatible actions. Vote for the action you want to take.';
+    if (session.status === 'RESOLVING') return 'The GM is preparing the next scene from the party’s actions.';
+    if (session.status === 'PAUSED') return 'The adventure is paused. The host can resume it.';
+    return 'The adventure has ended. Start a new game from the lobby.';
+  }
   if (session.status === 'LOBBY') {
     const players = session.players || [], minimum = session.minPartySize ?? 2;
     const waiting = players.filter(p => !p.ready || !validCharacter(p));
@@ -42,6 +71,7 @@ export function sessionGuide(session) {
   return '모험이 끝났어요. 새로 시작하려면 로비에서 /게임시작을 사용하세요.';
 }
 export function renderSession(session, text, { actionControls = true } = {}) {
+  const english = session.world?.language === 'en';
   const actor = session.combat?.order?.[session.combat.turnIndex];
   const footer = session.status === 'COMBAT_TURN' ? `\n현재 턴: ${session.players?.find(p=>p.userId===actor)?.name || actor} · 적 ${session.combat.enemies.map(e=>`${e.id} HP ${e.hp}`).join(', ')}` : '';
   const guide = sessionGuide(session);
@@ -50,18 +80,18 @@ export function renderSession(session, text, { actionControls = true } = {}) {
     : `${String(text ?? '모험 진행 중').slice(0, 1350)}${footer.slice(0, 190)}\n\n${guide}`.slice(0, 1900);
   const id = String(session.id).slice(0, 36), phase = String(session.phase ?? 0), status = String(session.status || 'LOBBY');
   const controls = [];
-  if (status === 'PAUSED') controls.push(button(`trpg:${id}:${phase}:resume`, '재개', 1), button(`trpg:${id}:${phase}:endConfirm`, '게임 종료', 4));
+  if (status === 'PAUSED') controls.push(button(`trpg:${id}:${phase}:resume`, english ? 'Resume' : '재개', 1), button(`trpg:${id}:${phase}:endConfirm`, english ? 'End game' : '게임 종료', 4));
   else if (status === 'LOBBY') {
     const players = session.players || [];
     const canStart = players.length >= (session.minPartySize ?? 2) && players.every(p => p.ready && validCharacter(p));
     controls.push(...CHARACTER_ROLES.map(role => button(`trpg:${id}:${phase}:chooseRole:${role.id}`, role.description, 2)));
-    controls.push(button(`trpg:${id}:${phase}:ready`, '준비 완료 / 취소', 3), button(`trpg:${id}:${phase}:start`, '모험 시작 (파티장)', 1, !canStart));
+    controls.push(button(`trpg:${id}:${phase}:ready`, english ? 'Ready / cancel' : '준비 완료 / 취소', 3), button(`trpg:${id}:${phase}:start`, english ? 'Start adventure (host)' : '모험 시작 (파티장)', 1, !canStart));
   }
-  else if (status === 'COMBAT_TURN' && actionControls) controls.push(button(`trpg:${id}:${phase}:attack`, '공격', 4), button(`trpg:${id}:${phase}:defend`, '방어', 2), button(`trpg:${id}:${phase}:help`, '동료 돕기', 2), button(`trpg:${id}:${phase}:item`, '치유 물약', 2));
+  else if (status === 'COMBAT_TURN' && actionControls) controls.push(button(`trpg:${id}:${phase}:attack`, english ? 'Attack' : '공격', 4), button(`trpg:${id}:${phase}:defend`, english ? 'Defend' : '방어', 2), button(`trpg:${id}:${phase}:help`, english ? 'Help ally' : '동료 돕기', 2), button(`trpg:${id}:${phase}:item`, english ? 'Healing potion' : '치유 물약', 2));
   else if (status === 'CONSENSUS_VOTE' && actionControls) for (const [index, choice] of (session.vote?.options || []).slice(0, 6).entries()) controls.push(button(`trpg:${id}:${phase}:vote:${index}`, choice.label));
   else if (status === 'EXPLORATION_COLLECTING' && actionControls) for (const [index, choice] of (session.choices || []).slice(0, 4).entries()) controls.push(button(`trpg:${id}:${phase}:inputChoice:${index}`, choice.label));
-  if (status !== 'LOBBY' && status !== 'PAUSED' && status !== 'ENDED') controls.push(button(`trpg:${id}:${phase}:pause`, '일시정지', 2), button(`trpg:${id}:${phase}:endConfirm`, '게임 종료', 4));
-  controls.push(button(`trpg:${id}:${phase}:helpGuide`, '어떻게 해요?', 2));
+  if (status !== 'LOBBY' && status !== 'PAUSED' && status !== 'ENDED') controls.push(button(`trpg:${id}:${phase}:pause`, english ? 'Pause' : '일시정지', 2), button(`trpg:${id}:${phase}:endConfirm`, english ? 'End game' : '게임 종료', 4));
+  controls.push(button(`trpg:${id}:${phase}:helpGuide`, english ? 'How to play' : '어떻게 해요?', 2));
   const rows = []; for (let i = 0; i < controls.length; i += 5) rows.push({ type: 1, components: controls.slice(i, i + 5) });
   return { content, allowed_mentions: { parse: [] }, components: rows };
 }

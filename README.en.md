@@ -8,6 +8,7 @@ A self-hosted Korean AI TRPG bot for small Discord groups. It keeps sessions, pl
 - Free-form character roles such as a family retainer, mining technician, or netrunner
 - Solo administrator mode and 2–6 player sessions
 - Button choices, free-form actions, conflict voting, turn-based combat, and durable story history
+- English campaign worlds and AI narration when the host selects English at game creation
 - Codex subscription mode or an operator-provided OpenAI API configuration
 
 ## Quick start

@@ -36,16 +36,25 @@ const GENRES = {
   }
 };
 
+const EN_GENRES = {
+  fantasy: { name: 'Fantasy', titles: ['The Kingdom Where Stars Went Dark', 'The Glass Moon Frontier'], locations: ['the old gate outside the capital', 'a misty border village'], threats: ['a shadow leaking from a broken seal', 'a smuggler ring that stole a royal document'], factions: ['the city watch', 'the Moonshade Caravan'], details: ['a blue sigil spreads across the wet stones', 'someone left behind a map burned at the edges'] },
+  sf: { name: 'Science Fiction', titles: ['The Last Signal Beyond the Solar System', 'Silence at Aurora Station'], locations: ['the quarantine deck of an orbital station', 'a mining city on Mars'], threats: ['an encrypted signal from a missing expedition', 'a maintenance AI that escaped its constraints'], factions: ['the station authority', 'the independent freighter guild'], details: ['emergency lights pulse a slow red', 'a broken voice repeats on the comm channel'] },
+  martial: { name: 'Martial Arts', titles: ['The Black Dragon Escort Contract', 'The Lost Heir of the Azure Sword'], locations: ['the rain-soaked yard behind an inn', 'the river market at a ferry crossing'], threats: ['a missing shipment and a rumor of betrayal', 'an old blood letter dividing a great family'], factions: ['the Nangong family outer court', 'the Black Dragon Escort Agency'], details: ['rain falls from the eaves onto a sword sheath', 'a cipher is carved beneath a tea cup'] },
+  cyberpunk: { name: 'Cyberpunk', titles: ['The Missing Person Under Neon', 'The Lie in the City Operating System'], locations: ['a rain-soaked lower-city night market', 'a service corridor beneath a corporate tower'], threats: ['erased citizen records and a missing client', 'surveillance footage hidden by a corporate AI'], factions: ['Aurora Megacorp', 'the underground netrunner collective'], details: ['neon signs shatter across puddles', 'a drone circles the same alley for a third time'] },
+  mystery: { name: 'Mystery', titles: ['The Seventh Room of the Rainy Manor', 'The Invitation from a Vanished Village'], locations: ['the entrance hall of a sealed manor', 'an old hotel beside the station'], threats: ['a night nobody can remember', 'evidence that vanished from a locked room'], factions: ['the local police', 'the manor staff'], details: ['every clock stopped at the same minute', 'wet footprints end halfway down the corridor'] }
+};
+
 const legacyGenre = { harbor: 'fantasy', desert: 'fantasy', library: 'mystery', festival: 'fantasy' };
 const hash = value => [...String(value)].reduce((n, ch) => ((n * 31) + ch.charCodeAt(0)) >>> 0, 2166136261);
 const pick = (values, seed, offset) => values[(seed + offset) % values.length];
 
 export const CAMPAIGN_GENRES = Object.freeze(Object.entries(GENRES).map(([id, genre]) => ({ id, name: genre.name })));
 
-export function createCampaign({ id, genre, tone, name } = {}) {
+export function createCampaign({ id, genre, tone, name, language } = {}) {
   const requested = String(genre ?? '').trim().toLowerCase();
   const genreId = GENRES[requested] ? requested : legacyGenre[requested] || CAMPAIGN_GENRES[hash(id) % CAMPAIGN_GENRES.length].id;
-  const source = GENRES[genreId];
+  const locale = String(language ?? '').toLowerCase().startsWith('en') ? 'en' : 'ko';
+  const source = (locale === 'en' ? EN_GENRES : GENRES)[genreId];
   const seed = hash(id || `${genreId}:${name}:${tone}`);
   const title = String(name || '').trim() || pick(source.titles, seed, 1);
   const location = pick(source.locations, seed, 2);
@@ -53,14 +62,15 @@ export function createCampaign({ id, genre, tone, name } = {}) {
   const factions = [pick(source.factions, seed, 4), pick(source.factions, seed, 5)].filter((x, index, all) => all.indexOf(x) === index);
   const detail = pick(source.details, seed, 6);
   return {
-    name: title, genre: source.name, genreId, tone: String(tone || source.name).slice(0, 200), location,
-    premise: threat, factions, objective: `${threat}의 진상을 밝히고, 그 결과를 스스로 결정한다.`,
-    facts: [threat, `${factions[0]}이(가) 이 사건의 일부를 알고 있다.`, detail],
-    opening: `${location}에서 시작합니다. ${detail}. 지금 이곳을 흔드는 문제는 ${threat}입니다. 누구를 믿고 어떤 대가를 치를지는 일행의 선택에 달려 있습니다.`,
+    name: title, genre: source.name, genreId, language: locale, tone: String(tone || source.name).slice(0, 200), location,
+    premise: threat, factions,
+    objective: locale === 'en' ? `Uncover the truth behind ${threat}, then decide what to do with it.` : `${threat}의 진상을 밝히고, 그 결과를 스스로 결정한다.`,
+    facts: locale === 'en' ? [threat, `${factions[0]} knows part of this incident.`, detail] : [threat, `${factions[0]}이(가) 이 사건의 일부를 알고 있다.`, detail],
+    opening: locale === 'en' ? `Your story begins at ${location}. ${detail}. The problem shaking this place is ${threat}. Whom you trust and what price you pay are up to the party.` : `${location}에서 시작합니다. ${detail}. 지금 이곳을 흔드는 문제는 ${threat}입니다. 누구를 믿고 어떤 대가를 치를지는 일행의 선택에 달려 있습니다.`,
     starterChoices: [
-      { label: '현장 조사', intent: `${location}의 흔적과 증거를 직접 조사한다` },
-      { label: '세력 접촉', intent: `${factions[0]}의 인물을 찾아 정보를 거래하거나 압박한다` },
-      { label: '독자 행동', intent: '정해진 단서를 따르지 않고, 각자의 방식으로 상황을 바꿀 계획을 실행한다' }
+      { label: locale === 'en' ? 'Investigate the scene' : '현장 조사', intent: locale === 'en' ? `Investigate clues and evidence at ${location}` : `${location}의 흔적과 증거를 직접 조사한다` },
+      { label: locale === 'en' ? 'Contact a faction' : '세력 접촉', intent: locale === 'en' ? `Find someone from ${factions[0]} and trade for or pressure them for information` : `${factions[0]}의 인물을 찾아 정보를 거래하거나 압박한다` },
+      { label: locale === 'en' ? 'Take an independent action' : '독자 행동', intent: locale === 'en' ? 'Ignore the suggested clues and execute a plan that changes the situation on your own terms' : '정해진 단서를 따르지 않고, 각자의 방식으로 상황을 바꿀 계획을 실행한다' }
     ]
   };
 }
