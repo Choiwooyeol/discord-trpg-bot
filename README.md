@@ -65,3 +65,5 @@ npm run backup       # SQLite 백업
 AI는 이야기와 행동 해석을 돕지만 판정·저장·Discord 발송은 봇이 통제합니다. 전투는 기본 규칙만 제공하며 PvP, 비밀 DM, 대규모 캠페인 메모리는 아직 지원하지 않습니다.
 
 보안 안내는 [SECURITY.md](SECURITY.md), 기여 방법은 [CONTRIBUTING.md](CONTRIBUTING.md), 변경 내역은 [CHANGELOG.md](CHANGELOG.md)에 있습니다. 이 프로젝트는 [MIT License](LICENSE)로 배포됩니다.
+
+다음 개발 방향은 [제품 로드맵](docs/ROADMAP.md)에 정리했습니다.
