@@ -1,0 +1,4 @@
+export const STATUS=Object.freeze(Object.fromEntries(['LOBBY','EXPLORATION_COLLECTING','CONSENSUS_VOTE','RESOLVING','COMBAT_TURN','PAUSED','ENDED'].map(s=>[s,s])));
+const edges={LOBBY:['EXPLORATION_COLLECTING','PAUSED','ENDED'],EXPLORATION_COLLECTING:['RESOLVING','PAUSED','ENDED'],RESOLVING:['CONSENSUS_VOTE','EXPLORATION_COLLECTING','COMBAT_TURN','PAUSED','ENDED'],CONSENSUS_VOTE:['RESOLVING','PAUSED','ENDED'],COMBAT_TURN:['COMBAT_TURN','EXPLORATION_COLLECTING','PAUSED','ENDED'],PAUSED:['LOBBY','EXPLORATION_COLLECTING','CONSENSUS_VOTE','RESOLVING','COMBAT_TURN','ENDED'],ENDED:[]};
+export function transition(session,status){if(!edges[session.status]?.includes(status))throw Error(`허용되지 않는 상태 변경: ${session.status} → ${status}`);session.status=status;session.phase++;session.deadline=null;return session;}
+export function canAcceptInput(status){return status==='EXPLORATION_COLLECTING'||status==='COMBAT_TURN';}

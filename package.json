@@ -1,0 +1,20 @@
+{
+  "name": "discord-trpg-bot",
+  "description": "A self-hosted Korean Discord AI TRPG bot for small groups",
+  "version": "0.1.0",
+  "private": true,
+  "license": "MIT",
+  "type": "module",
+  "engines": { "node": ">=24.12.0" },
+  "scripts": {
+    "start": "node --env-file-if-exists=.env src/main.mjs",
+    "test": "node --test tests/*.test.mjs",
+    "check": "node --env-file-if-exists=.env src/check.mjs",
+    "check-ai": "node --env-file-if-exists=.env src/check-ai.mjs",
+    "check-ai-long": "node --env-file-if-exists=.env src/check-ai-long.mjs",
+    "demo": "node src/demo.mjs",
+    "status": "node --env-file-if-exists=.env src/status.mjs",
+    "backup": "node --env-file-if-exists=.env src/backup.mjs",
+    "public-check": "node src/public-check.mjs"
+  }
+}

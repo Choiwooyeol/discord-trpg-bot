@@ -1,0 +1,26 @@
+[Unit]
+Description=Friends Discord TRPG Bot
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=discord-trpg
+Group=discord-trpg
+WorkingDirectory=/opt/discord-trpg-bot/current
+EnvironmentFile=/etc/discord-trpg-bot.env
+# EnvironmentFile values override Environment; enforce the persistent DB at launch.
+ExecStart=/usr/bin/env DATABASE_FILE=/opt/discord-trpg-bot/data/trpg.sqlite node src/main.mjs
+Restart=on-failure
+RestartSec=10
+TimeoutStopSec=110
+MemoryMax=384M
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/discord-trpg-bot/data
+
+[Install]
+WantedBy=multi-user.target
