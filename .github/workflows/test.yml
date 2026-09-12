@@ -17,4 +17,9 @@ jobs:
           node-version: 24
       - run: npm test
       - run: npm run check
+        env:
+          AI_PROVIDER: codex
+          DISCORD_BOT_TOKEN: offline-config-check
+          DISCORD_ALLOWED_GUILD_IDS: '100000000000001'
+          DISCORD_LOBBY_CHANNEL_IDS: '100000000000002'
       - run: npm run public-check

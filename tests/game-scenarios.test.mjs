@@ -2,11 +2,15 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { Store } from '../src/persistence/db.mjs';
 import { GameEngine } from '../src/game/engine.mjs';
+import { DemoDirector } from '../src/ai/demo-director.mjs';
+
+const demoDirector = new DemoDirector();
 
 const wait = () => new Promise(resolve => setImmediate(resolve));
 
 function makeDirector({ deferredInterpret = null, combat = null, seen = null } = {}) {
   return {
+    async campaign(context) { return demoDirector.campaign(context); },
     async interpret(context) {
       if (seen) seen.push(structuredClone(context));
       if (deferredInterpret) await deferredInterpret.promise;
@@ -79,6 +83,7 @@ test('동일한 최종 입력 event id는 한 번만 해결된다', async () => 
 test('다수결 투표는 과반이 선택한 충돌 행동만 남긴다', async () => {
   const store = new Store(':memory:');
   const director = {
+    async campaign(context) { return demoDirector.campaign(context); },
     async interpret() { return { actions: [{ userId: 'u1', intent: '왼쪽', classification: 'CONFLICTING', group: 'a' }, { userId: 'u2', intent: '오른쪽', classification: 'CONFLICTING', group: 'b' }], combat: null }; },
     async narrate(ctx) { return { narration: ctx.interpretation.actions.map(a => a.intent).join(','), location: '교차로', facts: [], choices: [], summary: '투표 결과' }; }
   };
@@ -104,7 +109,7 @@ test('저장된 ROLLED job은 recovery에서 주사위를 다시 굴리지 않�
   await engine.handle(event('a1', 'u1', 'input', '조사'));
   const run = engine.handle(event('b1', 'u2', 'input', '돕기'));
   await run;
-  const jobs = store.jobs(); const job = jobs.at(-1);
+  const jobs = store.jobs(); const job = jobs.find(candidate => candidate.kind !== 'CAMPAIGN') ?? jobs.at(-1);
   assert.ok(job.checks?.length || job.status === 'FAILED');
   const before = rolls.length; await engine.recover(); assert.equal(rolls.length, before); assert.ok(narrateCalls >= 1); store.close();
 });

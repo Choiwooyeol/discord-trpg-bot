@@ -14,7 +14,7 @@ export function sessionGuide(session) {
       return [
         '**Adventure setup — use the controls below**',
         '1. Choose a role or create one with `/캐릭터` → 2. Mark ready → 3. The host starts the adventure.',
-        `${session.world?.genre || 'Random'} world · ${session.world?.premise || 'Your first problem will be revealed when the game starts.'}`,
+        `${session.world?.genre || 'Random'} world · Starting generates a new setting and incident based on your characters.`,
         `\n**Players: ${players.length} · minimum: ${minimum}**`,
         ...players.map((p, index) => `${playerName(p, index).slice(0, 40)}${p.userId === session.hostId ? ' (host)' : ''} · ${validCharacter(p) ? `${p.character.role} · ${p.ready ? '✅ ready' : 'needs to ready up'}` : 'needs a role'}`),
         players.length < minimum ? `\n${minimum - players.length} more player(s) needed.` : waiting.length ? '\nEveryone must choose a role and mark ready.' : '\nEveryone is ready. The host can start the adventure.',
@@ -31,7 +31,7 @@ export function sessionGuide(session) {
     }
     if (session.status === 'COMBAT_TURN') return 'Only the current player may act: attack, defend, help an ally, or use a potion.';
     if (session.status === 'CONSENSUS_VOTE') return 'The party chose incompatible actions. Vote for the action you want to take.';
-    if (session.status === 'RESOLVING') return 'The GM is preparing the next scene from the party’s actions.';
+    if (session.status === 'RESOLVING') return session.scene === 0 ? 'The GM is creating your world and first scene. Choices appear when it is ready; there is no need to press Start again.' : 'The GM is preparing the next scene from the party’s actions.';
     if (session.status === 'PAUSED') return 'The adventure is paused. The host can resume it.';
     return 'The adventure has ended. Start a new game from the lobby.';
   }
@@ -43,7 +43,7 @@ export function sessionGuide(session) {
       '① 직업 선택 → ② 준비 완료 → ③ 파티장이 모험 시작',
       '빠른 역할 버튼을 누르거나 /캐릭터로 자유 직업을 작성할 수 있어요.',
       '버튼을 누르면 자동 참가해요. 자유 직업 예: 남궁세가 가신, 화성 광산 기술자, 네트러너.',
-      `${session.world?.genre || '랜덤'} 세계 · ${session.world?.premise || '이번 세계의 문제는 시작과 함께 드러납니다.'}`,
+      `${session.world?.genre || '랜덤'} 세계 · 시작을 누르면 캐릭터에 맞춰 배경과 첫 사건을 새로 생성해요.`,
       `\n**참가자 ${players.length}명 · 최소 ${minimum}명**`,
       ...players.map((p, index) => `${playerName(p, index).slice(0, 40)}${p.userId === session.hostId ? ' (파티장)' : ''} · ${validCharacter(p) ? `${p.character.role} · ${p.ready ? '✅ 준비 완료' : '준비 버튼을 눌러 주세요'}` : '직업 버튼을 골라 주세요'}`),
       players.length < minimum ? `\n친구 ${minimum - players.length}명이 더 참가하면 시작할 수 있어요.` : waiting.length ? '\n모두 직업을 고르고 준비하면 시작 버튼이 켜져요.' : '\n모두 준비됐어요! 파티장이 [모험 시작]을 눌러 주세요.',
@@ -62,11 +62,11 @@ export function sessionGuide(session) {
       const label = session.choices?.find(choice => choice.intent === value)?.label || value;
       return `${playerName(p, players.indexOf(p))}: ${String(label).slice(0, 90)}`;
     }).join('\n') : '';
-    return `각자 아래 선택지 하나를 누르거나, 채팅에 “등불을 조사한다”처럼 행동을 적어 주세요. 주사위는 봇이 굴려요. 잡담은 //로 시작하세요.\n${waitingText}${selectedText ? `\n\n**선택한 행동**\n${selectedText}` : ''}`;
+    return `각자 아래 선택지를 누르거나 채팅에 자유 행동을 적어 주세요. 제안을 거절하거나 다른 곳으로 이동해도 돼요. 주사위는 봇이 굴려요. 잡담은 //로 시작하세요.\n${waitingText}${selectedText ? `\n\n**선택한 행동**\n${selectedText}` : ''}`;
   }
   if (session.status === 'COMBAT_TURN') return '현재 차례인 사람만 행동을 고르세요. 공격: 적 공격 · 방어: 피해 줄이기 · 동료 돕기: 다음 동료 지원 · 물약: 내 체력 회복';
   if (session.status === 'CONSENSUS_VOTE') return '함께 할 행동이 엇갈렸어요. 각자 원하는 선택지에 투표해 주세요.';
-  if (session.status === 'RESOLVING') return '모두의 행동을 바탕으로 다음 장면을 만들고 있어요. 잠시 기다려 주세요.';
+  if (session.status === 'RESOLVING') return session.scene === 0 ? '새로운 세계와 첫 장면을 생성 중이에요. 완료되면 선택지가 나타납니다. 시작 버튼을 다시 누를 필요 없어요.' : '모두의 행동을 바탕으로 다음 장면을 만들고 있어요. 잠시 기다려 주세요.';
   if (session.status === 'PAUSED') return '모험을 쉬고 있어요. 파티장이 [재개]를 누르면 이어집니다.';
   return '모험이 끝났어요. 새로 시작하려면 로비에서 /게임시작을 사용하세요.';
 }

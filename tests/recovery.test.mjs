@@ -36,7 +36,9 @@ test('restart from durable ROLLED job reuses dice and actually finishes the scen
 });
 test('three independent parties proceed while one AI request is pending',async()=>{
   const db=new Store(),base=new DemoDirector();let release;
-  const gate=new Promise(r=>release=r),slow={interpret:async c=>{await gate;return base.interpret(c);},narrate:c=>base.narrate(c)};
+  const campaign=base.campaign.bind(base);
+  base.campaign=async c=>{const world=await campaign(c);return {...world,location:c.seed,opening:`${world.opening} ${c.seed}`};};
+  const gate=new Promise(r=>release=r),slow={campaign:c=>base.campaign(c),interpret:async c=>{await gate;return base.interpret(c);},narrate:c=>base.narrate(c)};
   const a=await setup(db,slow,'one'),b=await setup(db,base,'two'),c=await setup(db,base,'three');
   await a.act('a','input','조사');const waiting=a.act('b','input','지원');
   try{

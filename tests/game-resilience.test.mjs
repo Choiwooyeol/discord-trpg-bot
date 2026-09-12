@@ -3,8 +3,10 @@ import assert from 'node:assert/strict';
 import { Store } from '../src/persistence/db.mjs';
 import { GameEngine } from '../src/game/engine.mjs';
 import { configFrom } from '../src/config.mjs';
+import { DemoDirector } from '../src/ai/demo-director.mjs';
 
-const director = { async interpret() { return { actions: [], combat: null }; }, async narrate() { return { narration: 'ok', location: '숲', facts: [], choices: [], summary: 'ok' }; } };
+const demoDirector = new DemoDirector();
+const director = { async campaign(context) { return demoDirector.campaign(context); }, async interpret() { return { actions: [], combat: null }; }, async narrate() { return { narration: 'ok', location: '숲', facts: [], choices: [], summary: 'ok' }; } };
 const event = (id, userId, action, value) => ({ id, guildId: 'g', threadId: 't', userId, name: userId, action, value });
 
 test('LOBBY_IDLE_HOURS is validated and exposed as milliseconds', () => {

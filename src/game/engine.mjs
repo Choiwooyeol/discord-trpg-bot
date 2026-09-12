@@ -3,7 +3,8 @@ import { transition } from './state-machine.mjs';
 import { check, ABILITIES, characterProfile, characterRole, validCharacterProfile } from './rules.mjs';
 import { createCombat, currentActor, playCombat } from './combat.mjs';
 import { buildContext } from './context.mjs';
-import { createCampaign } from './campaigns.mjs';
+import { createCampaignSetup, recentCampaignStarts, chooseOpeningStyle } from './campaigns.mjs';
+import { validateCampaign } from '../ai/campaign-contract.mjs';
 const active=s=>s.players.filter(p=>p.presence==='active'&&p.ready);
 const clean=(v,n=80)=>String(v??'').replace(/[@\r\n]/g,' ').trim().slice(0,n);
 export class GameEngine {
@@ -14,17 +15,18 @@ export class GameEngine {
     this.consensusMs=config.consensusMs??(config.consensusSeconds??30)*1000;this.combatMs=config.combatMs??(config.combatSeconds??90)*1000;
     this.now=options.now??Date.now;this.roll=options.roll;this.inFlight=new Map();
   }
-  create({guildId,threadId,hostId,name,tone='판타지',scenarioId,language,minPartySize=this.config.minPartySize}) {
+  create({guildId,threadId,hostId,name,tone='',scenarioId,language,minPartySize=this.config.minPartySize}) {
     minPartySize=Number(minPartySize);
     if(!Number.isInteger(minPartySize)||minPartySize<1||minPartySize>this.config.maxPartySize)throw Error('Invalid min party size.');
     if(this.store.all().filter(s=>s.status!=='ENDED').length>=this.config.maxActiveSessions)throw Error('최대 세션 수에 도달했습니다.');
-    const id=randomUUID(), campaign=createCampaign({id,genre:scenarioId,tone,name:clean(name),language});
+    const id=randomUUID(), previousGenre=recentCampaignStarts(this.store.all(),guildId)[0]?.genreId;
+    const campaign=createCampaignSetup({genre:scenarioId,tone,name:clean(name),language,previousGenre});
     return this.store.create({id,guildId,threadId,hostId,status:'LOBBY',version:0,phase:0,scene:0,phaseStartedAt:this.now(),deadline:null,minPartySize,maxPartySize:this.config.maxPartySize,players:[],actions:{},world:campaign,summary:'',recent:[],choices:[],combat:null});
   }
   _phase(s,status){transition(s,status);s.phaseStartedAt=this.now();}
   _save(s,e,text,job=null) {
     const snapshot=structuredClone(s);
-    const historyActions=new Set(['start','RESOLVE','SCENE_RESULT','attack','defend','help','item']);
+    const historyActions=new Set(['CAMPAIGN_RESULT','RESOLVE','SCENE_RESULT','attack','defend','help','item']);
     const messages=!text?[]:historyActions.has(e?.action)
       ? [{content:text,history:true,trpgSession:snapshot,actionControls:e?.action!=='RESOLVE'}, {content:'현재 행동 현황입니다. 결과 카드의 선택 버튼으로 이어가세요.',trpgSession:snapshot,actionControls:false}]
       : [{content:text,trpgSession:snapshot}];
@@ -93,9 +95,13 @@ export class GameEngine {
       if(!host||s.status!=='LOBBY')return this._deny('로비의 파티장만 시작할 수 있습니다.');
       if(s.players.length<s.minPartySize||s.players.some(p=>!p.ready||!p.character))return this._deny(`최소 ${s.minPartySize}명이 필요합니다. 모두 직업을 고르고 [준비 완료]를 눌러 주세요.`);
       if(s.players.some(p=>!validCharacterProfile(p.character)))return this._deny('직업을 다시 선택하거나 설정해 주세요. /캐릭터에서 자유 직업을 적거나 아래 버튼을 눌러 주세요.');
-      this._phase(s,'EXPLORATION_COLLECTING');s.scene=1;
-      s.choices=structuredClone(s.world.starterChoices||[{label:'등불 조사',intent:'등불 주변의 흔적을 조사한다'},{label:'탑으로 이동',intent:'동료들과 함께 봉인된 탑으로 이동한다'},{label:'주변 경계',intent:'일행을 보호하며 주변을 경계한다'}]);
-      return this._save(s,e,`${s.world.opening||'낯선 길 앞에서 모험이 시작됩니다.'}\n각자 행동을 입력하세요. 첫 행동부터 수집 시간이 시작됩니다. 잡담은 //로 시작하세요.`);
+      this._phase(s,'RESOLVING');s.jobId=`${s.id}:campaign`;
+      const {genreId,genre,language,tone,requestedName}=s.world;
+      const recentStarts=recentCampaignStarts(this.store.all(),s.guildId,s.id);
+      const request={seed:randomUUID(),openingStyle:chooseOpeningStyle(recentStarts),world:{genreId,genre,language,tone,requestedName},players:structuredClone(s.players),recentStarts};
+      const job={id:s.jobId,sessionId:s.id,scene:0,kind:'CAMPAIGN',status:'PENDING',request,createdAt:this.now()};
+      this._save(s,e,language==='en'?'Creating a new world and opening from your party’s characters…':'준비한 캐릭터를 바탕으로 새로운 세계와 첫 사건을 만들고 있어요. 잠시 기다려 주세요.',job);
+      return this._run(s.id);
     }
     if(['pause','resume','end'].includes(a)){
       if(!host)return this._deny('파티장만 진행 상태를 변경할 수 있습니다.');
@@ -169,13 +175,34 @@ export class GameEngine {
   }
   _run(id){
     if(this.inFlight.has(id))return this.inFlight.get(id);
-    const task=this._process(id).finally(()=>{this.inFlight.delete(id);});this.inFlight.set(id,task);return task;
+    const task=(async()=>{
+      let result,phase;
+      do {
+        phase=this.store.get(id)?.phase;result=await this._process(id);
+        // A resume during an older request needs a fresh run after that request exits.
+      } while(this.store.get(id)?.status==='RESOLVING'&&this.store.get(id)?.phase!==phase);
+      return result;
+    })().finally(()=>{this.inFlight.delete(id);});this.inFlight.set(id,task);return task;
   }
   async _process(id){
     let s=this.store.get(id);if(s?.status!=='RESOLVING')return {text:'처리가 보류되었습니다.'};
-    const phase=s.phase,job=this.store.job(s.jobId);if(!job)throw Error('장면 작업이 없습니다.');
+    const phase=s.phase,job=this.store.job(s.jobId);
+    if(!job){s.previousStatus='RESOLVING';this._phase(s,'PAUSED');return this._save(s,{action:'AI_ERROR'},'저장된 진행 작업을 찾지 못해 일시정지했습니다. 기록을 보존한 채 운영자 점검이 필요합니다.');}
     const current=()=>{const x=this.store.get(id);return x?.status==='RESOLVING'&&x.phase===phase&&x.jobId===job.id?x:null;};
     try{
+      if(job.kind==='CAMPAIGN'){
+        if(!job.response){
+          const generated=validateCampaign(await this.director.campaign(job.request),job.request);
+          if(!current())return this._deny('이전 세계 생성 응답을 보류했습니다.');
+          job.response=generated;job.status='GENERATED';this.store.saveJob(job);
+        }
+        s=current();if(!s)return this._deny('이전 세계 생성 응답을 보류했습니다.');
+        const generated=validateCampaign(job.response,job.request);
+        s.world={...s.world,...structuredClone(generated),openingStyle:job.request.openingStyle,startLocation:generated.location,generatedAt:this.now(),generation:'ai-v1'};
+        s.choices=structuredClone(generated.starterChoices);s.summary=generated.premise;s.recent=[generated.opening];s.scene=1;
+        this._phase(s,'EXPLORATION_COLLECTING');job.status='DONE';delete job.error;
+        return this._save(s,{id:`done:${job.id}`,action:'CAMPAIGN_RESULT'},`**${generated.name}**\n\n${generated.opening}`,job);
+      }
       if(job.status==='PENDING'){
         job.interpretation=await this.director.interpret(job.request);if(!current())return this._deny('이전 장면 응답을 보류했습니다.');
         job.status='INTERPRETED';this.store.saveJob(job);
@@ -217,7 +244,10 @@ export class GameEngine {
       return this._save(s,{id:`done:${job.id}`,action:'SCENE_RESULT',checks:job.checks},`${dice}${dice?'\n':''}${n.narration}`,job);
     }catch(error){
       s=current();if(!s)return this._deny('장면 처리를 보류했습니다.');job.error='AI 또는 판정 처리 실패';s.previousStatus='RESOLVING';this._phase(s,'PAUSED');
-      return this._save(s,{action:'AI_ERROR'},'AI 장면 처리에 실패하여 일시정지했습니다. 입력과 확정 주사위는 보존됩니다. 설정/예산을 확인하고 /재개하세요.',job);
+      const message=job.kind==='CAMPAIGN'
+        ? (s.world.language==='en'?'World generation failed; your characters are saved. Check AI access and usage limits, then press Resume to retry (uses another AI request).':'새 세계 생성에 실패해 일시정지했습니다. 캐릭터와 준비 내용은 보존됐어요. AI 로그인·사용 한도를 확인한 뒤 [재개]로 다시 생성하세요. 재시도 시 AI 요청이 추가됩니다.')
+        : 'AI 장면 처리에 실패하여 일시정지했습니다. 입력과 확정 주사위는 보존됩니다. 설정/예산을 확인하고 /재개하세요.';
+      return this._save(s,{action:'AI_ERROR'},message,job);
     }
   }
   _select(s,index){

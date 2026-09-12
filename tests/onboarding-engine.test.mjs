@@ -2,8 +2,10 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { Store } from '../src/persistence/db.mjs';
 import { GameEngine } from '../src/game/engine.mjs';
+import { DemoDirector } from '../src/ai/demo-director.mjs';
 
-const director = { async interpret() { return { actions: [], combat: null }; }, async narrate() { return { narration: 'ok', location: '숲', facts: [], choices: [], summary: 'ok' }; } };
+const demoDirector = new DemoDirector();
+const director = { async campaign(context) { return demoDirector.campaign(context); }, async interpret() { return { actions: [], combat: null }; }, async narrate() { return { narration: 'ok', location: '숲', facts: [], choices: [], summary: 'ok' }; } };
 const event = (id, userId, action, value, name = userId) => ({ id, guildId: 'g', threadId: 't', userId, name, action, value });
 
 test('기존 잘못된 직업도 다시 고를 수 있고 이름과 설정은 보존된다', async t => {
@@ -81,8 +83,8 @@ test('장르별 캠페인과 자유 직업은 고정 역할 목록 없이 준비
   const engine = new GameEngine(store, director, { minPartySize: 1 });
   const session = engine.create({ guildId: 'g', threadId: 't', hostId: 'u1', scenarioId: 'martial' });
   assert.equal(session.world.genre, '무협');
-  assert.ok(session.world.factions.length >= 1);
-  assert.equal(session.world.starterChoices.length, 3);
+  assert.deepEqual(session.world.factions, []);
+  assert.deepEqual(session.world.starterChoices, []);
 
   await engine.handle(event('join-custom', 'u1', 'join', undefined, '소청'));
   const created = await engine.handle(event('custom-character', 'u1', 'character', { name: '소청', role: '남궁세가 3대 가신', focus: '전투', specialty: '검술', weakness: '가문에 진 빚' }));
@@ -93,16 +95,24 @@ test('장르별 캠페인과 자유 직업은 고정 역할 목록 없이 준비
   await engine.handle(event('custom-ready', 'u1', 'ready'));
   const started = await engine.handle(event('custom-start', 'u1', 'start'));
   assert.equal(started.session.status, 'EXPLORATION_COLLECTING');
+  assert.ok(started.session.world.factions.length >= 1);
+  assert.equal(started.session.world.starterChoices.length, 3);
   store.close();
 });
 
-test('영어 세션은 영어 세계관과 선택지를 생성한다', () => {
+test('영어 세션은 시작 시 영어 세계관과 선택지를 생성한다', async () => {
   const store = new Store(':memory:');
   const engine = new GameEngine(store, director, { minPartySize: 1 });
   const session = engine.create({ guildId: 'g', threadId: 'english', hostId: 'u1', scenarioId: 'cyberpunk', language: 'en' });
   assert.equal(session.world.language, 'en');
   assert.equal(session.world.genre, 'Cyberpunk');
-  assert.match(session.world.opening, /Your story begins/);
-  assert.match(session.world.starterChoices[0].label, /Investigate/);
+  assert.equal(session.world.opening, '');
+  assert.deepEqual(session.world.starterChoices, []);
+  const englishEvent = (id, action, value) => ({ id, guildId: 'g', threadId: 'english', userId: 'u1', name: 'u1', action, value });
+  await engine.handle(englishEvent('role-en', 'chooseRole', 'warrior'));
+  await engine.handle(englishEvent('ready-en', 'ready'));
+  const started = await engine.handle(englishEvent('start-en', 'start'));
+  assert.match(started.session.world.opening, /Your story begins/);
+  assert.match(started.session.world.starterChoices[0].label, /Investigate/);
   store.close();
 });

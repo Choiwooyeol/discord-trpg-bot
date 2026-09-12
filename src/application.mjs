@@ -77,7 +77,7 @@ export class Application {
     this.store.setValue(key,{status:'UNKNOWN'});
     // A persisted UNKNOWN prevents retrying a potentially successful external creation.
     const thread=await this.discord.createThread(event.guildId,event.threadId,`${event.name || '친구들'}의 모험`,event.id);
-    const session=this.engine.create({guildId:event.guildId,threadId:thread.id,hostId:event.userId,tone:String(event.value?.tone||'친구들과 즐기는 판타지 모험').slice(0,200),scenarioId:event.value?.scenario,language:event.value?.language||event.locale,minPartySize:event.solo===true?1:this.config.minPartySize});
+    const session=this.engine.create({guildId:event.guildId,threadId:thread.id,hostId:event.userId,tone:String(event.value?.tone||'').slice(0,200),scenarioId:event.value?.scenario,language:event.value?.language||event.locale,minPartySize:event.solo===true?1:this.config.minPartySize});
     this.store.setValue(key,{status:'CREATED',threadId:thread.id,sessionId:session.id});
     await this.engine.handle({...event,id:`${event.id}:join`,threadId:thread.id,action:'join'});
     return {text:`모험을 만들었어요! <#${thread.id}>를 눌러 들어오세요.\n각자 직업 버튼 → 준비 완료 → 파티장이 모험 시작! 이름은 Discord 닉네임으로 자동 설정돼요.`};

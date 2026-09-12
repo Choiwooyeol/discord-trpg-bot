@@ -2,9 +2,13 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { Store } from '../src/persistence/db.mjs';
 import { GameEngine } from '../src/game/engine.mjs';
+import { DemoDirector } from '../src/ai/demo-director.mjs';
+
+const demoDirector = new DemoDirector();
 
 function director() {
   return {
+    async campaign(context) { return demoDirector.campaign(context); },
     async interpret(ctx) { return { actions: Object.values(ctx.actions).map(a => ({ userId: a.userId, intent: a.value, classification: 'COOPERATIVE', group: 'g' })), combat: null }; },
     async narrate(ctx) { return { narration: `결과: ${Object.keys(ctx.actions).length}`, location: '숲', facts: [], choices: [{ label: '계속', intent: '계속 걷는다' }], summary: '숲을 걸었다.' }; }
   };

@@ -12,6 +12,7 @@
     "check": "node --env-file-if-exists=.env src/check.mjs",
     "check-ai": "node --env-file-if-exists=.env src/check-ai.mjs",
     "check-ai-long": "node --env-file-if-exists=.env src/check-ai-long.mjs",
+    "check-campaigns": "node --env-file-if-exists=.env src/check-campaigns.mjs",
     "demo": "node src/demo.mjs",
     "status": "node --env-file-if-exists=.env src/status.mjs",
     "backup": "node --env-file-if-exists=.env src/backup.mjs",
